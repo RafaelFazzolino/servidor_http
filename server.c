@@ -1,60 +1,68 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
-#include <sys/wait.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-#define MINHAPORTA 20000    /* Porta que os usuarios irão se conectar*/
-#define BACKLOG 10     /* Quantas conexões pendentes serão indexadas */
+void TrataClienteTCP(int socket_cliente) {
+	char buffer[200];
+	char texto[200];
+	int tamanho_recebido;
+	if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
+		printf("Erro no recv()\n");
+	buffer[tamanho_recebido] = '\0';
+	printf("Servidor!\n Recebi algo: %s \n", buffer);
 
-main()
-{
-	int Meusocket, Novosocket;  /* escuta em Meusocket, nova conexão
-	                               em Novosocket */
-	struct sockaddr_in meu_endereco;    /* informação do meu endereco */
-	struct sockaddr_in endereco_dele; /* informação do endereco do conector */
-	int tamanho;
-
-	if ((Meusocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
-	{
-		perror("socket");
+	while (tamanho_recebido > 0) {
+		strcpy(texto, "este texto foi modificado pelo servidor!\n\n\0");
+		strcat(texto, buffer);
+		if(send(socket_cliente, texto, tamanho_recebido, 0) != tamanho_recebido)
+			printf("Erro no envio - send()\n");
+		
+		if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
+			printf("Erro no recv()\n");
+	}
+}
+int main(int argc, char *argv[]) {
+	int socket_servidor;
+	int socket_cliente;
+	struct sockaddr_in servidorAddr;
+	struct sockaddr_in clienteAddr;
+	unsigned short servidorPorta;
+	unsigned int cliente_length;
+	if (argc != 2) { //Caso não tenha entrado com os parâmetros
+		printf("Uso: %s <Porta>\n", argv[0]);
 		exit(1);
 	}
-
-	meu_endereco.sin_family = AF_INET;
-	meu_endereco.sin_port = htons(MINHAPORTA);
-	meu_endereco.sin_addr.s_addr = INADDR_ANY; /* coloca IP automaticamente */
-	bzero(&(meu_endereco.sin_zero), 8);        /* Zera o resto da estrutura */
-
-	if (bind(Meusocket, (struct sockaddr *)&meu_endereco, sizeof(struct sockaddr))== -1) {
-		perror("bind");
-		exit(1);
-	}
+	servidorPorta = atoi(argv[1]);
+	// Abrir Socket
+	if((socket_servidor = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) //Gerando um socket tcp
+		printf("falha no socker do Servidor\n");
 	
-	if (listen(Meusocket, BACKLOG) < 0) {
-		perror("listen");
-		exit(1);
-	}
+	// Montando a estrutura sockaddr_in
+	memset(&servidorAddr, 0, sizeof(servidorAddr)); // Zerando a estrutura de dados
+	servidorAddr.sin_family = AF_INET;
+	servidorAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	servidorAddr.sin_port = htons(servidorPorta); //definindo a porta
 
+	// Bind
+	if(bind(socket_servidor, (struct sockaddr *) &servidorAddr, sizeof(servidorAddr)) < 0)
+		printf("Falha no Bind\n");
+	// Listen
+	if(listen(socket_servidor, 10) < 0) //definindo uma fila máxima de 10 clientes aguardando
+		printf("Falha no Listen\n");		
 	while(1) {
-		tamanho = sizeof(struct sockaddr_in);
-		if ((Novosocket = accept(Meusocket, (struct sockaddr *)&endereco_dele,&tamanho)) < 0){
-			perror("accept");
-			continue;
-		}
-		printf("Servidor: chegando conexão de %s\n",inet_ntoa(endereco_dele.sin_addr));
-		if (!fork()) {
-			if (send(Novosocket, "Seja bem vindo!\n", 16, 0) == -1)
-			{
-				perror("send");
-				close(Novosocket);
-				exit(0);
-			}
-		}
-		close(Novosocket);
-		while(waitpid(-1,NULL,WNOHANG) > 0); /* Limpa o processo crianca.fork() */
+		cliente_length = sizeof(clienteAddr);
+		if((socket_cliente = accept(socket_servidor, 
+			                      (struct sockaddr *) &clienteAddr, 
+			                      &cliente_length)) < 0)
+			printf("Falha no Accept\n");
+		
+		printf("Conexão do Cliente %s\n", inet_ntoa(clienteAddr.sin_addr));
+		
+		TrataClienteTCP(socket_cliente);
+		close(socket_cliente);
 	}
+	close(socket_servidor);
 }

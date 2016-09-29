@@ -1,57 +1,50 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <netdb.h>
-#include <sys/types.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-#define PORTA 20000    /* Porta para conectar */
-#define MAXDATASIZE 100 /* máximo número de bytes que poderemos enviar
-                           por vez */
-
-int main(int argc, char *argv[])
-{
-	int Meusocket, numbytes;
-	char buf[MAXDATASIZE];
-	struct hostent *he;
-	struct sockaddr_in seu_endereco;
-
-	if (argc != 2) {
-		fprintf(stderr,"Uso: cliente hostname\n");
+int main(int argc, char *argv[]) {
+	int clienteSocket;
+	struct sockaddr_in servidorAddr;
+	unsigned short servidorPorta;
+	char *IP_Servidor;
+	char *mensagem;
+	char buffer[200];
+	unsigned int tamanhoMensagem;
+	int bytesRecebidos;
+	int totalBytesRecebidos;
+	if ((argc < 3) || (argc > 4)) {
+		printf("Uso: %s <IP do Servidor> <Porta> <Mensagem>\n", argv[0]);
 		exit(1);
 	}
-
-	if ((he=gethostbyname(argv[1])) == NULL)   /* envia host info */
-	{
-		herror("gethostbyname");
-		exit(1);
+	IP_Servidor = argv[1];
+	servidorPorta = atoi(argv[2]);
+	mensagem = argv[3];
+	// Criar Socket
+	if((clienteSocket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+		printf("Erro no socket()\n");
+	// Construir struct sockaddr_in
+	memset(&servidorAddr, 0, sizeof(servidorAddr)); // Zerando a estrutura de dados
+	servidorAddr.sin_family = AF_INET;
+	servidorAddr.sin_addr.s_addr = inet_addr(IP_Servidor);
+	servidorAddr.sin_port = htons(servidorPorta);
+	// Connect
+	if(connect(clienteSocket, (struct sockaddr *) &servidorAddr, 
+							sizeof(servidorAddr)) < 0)
+		printf("Erro no connect()\n");
+	tamanhoMensagem = strlen(mensagem);
+	if(send(clienteSocket, mensagem, tamanhoMensagem, 0) != tamanhoMensagem)
+		printf("Erro no envio: numero de bytes enviados diferente do esperado\n");
+	totalBytesRecebidos = 0;
+	while(totalBytesRecebidos < tamanhoMensagem) {
+		if((bytesRecebidos = recv(clienteSocket, buffer, 199, 0)) <= 0)
+			printf("Não recebeu o total de bytes enviados\n");
+		totalBytesRecebidos += bytesRecebidos;
+		buffer[bytesRecebidos] = '\0';
+		printf("%s\n", buffer);
 	}
-	if ((Meusocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
-	{
-		perror("socket");
-		exit(1);
-	}
-
-	seu_endereco.sin_family = AF_INET;
-	seu_endereco.sin_port = htons(PORTA);
-	seu_endereco.sin_addr = *((struct in_addr *)he->h_addr);
-	bzero(&(seu_endereco.sin_zero), 8);
-
-	if (connect(Meusocket,(struct sockaddr *)&seu_endereco, sizeof(struct sockaddr)) ==-1) 
-	{
-		perror("connect");
-		exit(1);
-	}
-
-	if ((numbytes=recv(Meusocket, buf, MAXDATASIZE, 0)) == -1) 
-	{
-		perror("recv");
-		exit(1);
-	}
-	buf[numbytes] = '\0';
-	printf("Recebido: %s",buf);
-	close(Meusocket);
-	return 0;
+	close(clienteSocket);
+	exit(0);
 }
