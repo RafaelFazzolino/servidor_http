@@ -5,7 +5,29 @@
 #include <string.h>
 #include <unistd.h>
 
-void TrataClienteTCP(int socket_cliente) {
+char * get_data(char *texto){
+	char * data;
+	char * texto_completo;
+
+	FILE *fp;
+	fp = fopen(texto, "r");
+	
+	data = malloc(sizeof(char*));
+	texto_completo = malloc(sizeof(char*));
+
+
+	while(fgets(data, 100, (FILE*)fp) != NULL){
+		strcat(texto_completo, data);
+	   	//strcat(texto_completo, "\n");
+	}
+   	
+   	printf("%s", texto_completo);
+
+	fclose(fp);
+	return texto_completo;
+}
+
+void trata_cliente(int socket_cliente) {
 	char buffer[200];
 	char texto[200];
 	int tamanho_recebido, tamanho_envio, i;
@@ -21,6 +43,8 @@ void TrataClienteTCP(int socket_cliente) {
 		}
 	}
 
+	strcpy(texto, get_data(texto));
+	printf("RESULTADO: %s\n", texto);
 	while (tamanho_recebido > 0) {
 		tamanho_envio = strlen(texto);
 		if(send(socket_cliente, texto, tamanho_envio, 0) != tamanho_envio)
@@ -67,7 +91,7 @@ int main(int argc, char *argv[]) {
 		
 		printf("Conexão do Cliente %s\n", inet_ntoa(clienteAddr.sin_addr));
 		
-		TrataClienteTCP(socket_cliente);
+		trata_cliente(socket_cliente);
 		close(socket_cliente);
 	}
 	close(socket_servidor);
