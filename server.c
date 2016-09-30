@@ -8,14 +8,20 @@
 void TrataClienteTCP(int socket_cliente) {
 	char buffer[200];
 	char texto[200];
-	int tamanho_recebido, tamanho_envio;
+	int tamanho_recebido, tamanho_envio, i;
 	if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
 		printf("Erro no recv()\n");
 	buffer[tamanho_recebido] = '\0';
 	printf("Servidor!\n Recebi algo: %s \n", buffer);
+	if(buffer[0] == 'G' && buffer[1] == 'E' && buffer[2] == 'T'){
+		i=5;
+		while(buffer[i] != ' '){
+			texto[i-5] = buffer[i];
+			++i;
+		}
+	}
 
 	while (tamanho_recebido > 0) {
-		strcpy(texto, "este texto foi modificado pelo servidor!\n\n\0");
 		tamanho_envio = strlen(texto);
 		if(send(socket_cliente, texto, tamanho_envio, 0) != tamanho_envio)
 			printf("Erro no envio - send()\n");
