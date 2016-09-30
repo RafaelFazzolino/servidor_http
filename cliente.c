@@ -5,6 +5,20 @@
 #include <string.h>
 #include <unistd.h>
 
+int get_text(char *mensagem, int clienteSocket){
+	int tamanhoMensagem;
+	char requisicao[200];
+
+	strcpy(requisicao, "GET /");
+	strcat(requisicao, mensagem);
+	strcat(requisicao, " HTTP/1.1\r\n");
+	printf("requisicao: %s\n", requisicao);
+	tamanhoMensagem = strlen(requisicao);
+	if(send(clienteSocket, requisicao, tamanhoMensagem, 0) != tamanhoMensagem)
+		printf("Erro no envio: numero de bytes enviados diferente do esperado\n");
+	return strlen(requisicao);
+}
+
 int main(int argc, char *argv[]) {
 	int clienteSocket;
 	struct sockaddr_in servidorAddr;
@@ -34,13 +48,13 @@ int main(int argc, char *argv[]) {
 	if(connect(clienteSocket, (struct sockaddr *) &servidorAddr, 
 							sizeof(servidorAddr)) < 0)
 		printf("Erro no connect()\n");
-	tamanhoMensagem = strlen(mensagem);
-	if(send(clienteSocket, mensagem, tamanhoMensagem, 0) != tamanhoMensagem)
-		printf("Erro no envio: numero de bytes enviados diferente do esperado\n");
+
+	tamanhoMensagem = get_text(mensagem, clienteSocket);
+
 	totalBytesRecebidos = 0;
 	while(totalBytesRecebidos < tamanhoMensagem) {
 		if((bytesRecebidos = recv(clienteSocket, buffer, 199, 0)) <= 0)
-			printf("Não recebeu o total de bytes enviados\n");
+			printf("Alguns bytes foram perdidos\n");
 		totalBytesRecebidos += bytesRecebidos;
 		buffer[bytesRecebidos] = '\0';
 		printf("%s\n", buffer);
