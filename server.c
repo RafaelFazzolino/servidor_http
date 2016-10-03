@@ -4,19 +4,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 char * get_data(char *texto){
 	char * data;
 	char * texto_completo;
-
 	FILE *fp;
-	fp = fopen(texto, "r");//abrindo arquivo somente para leitura
-	
+	printf("Chegou no get_data\n");
+	fp = fopen(texto, "r");
+	if(fp == NULL){//abrindo arquivo somente para leitura
+		printf("404 Not Found");
+		return "404 Not Found\n";
+	}
+	printf("indo..\n");
 	data = malloc(sizeof(char*));
 	texto_completo = malloc(sizeof(char*));
 
-
+	printf("olha..\n");
 	while(fgets(data, 100, (FILE*)fp) != NULL){//Enquanto não chegar ao fim do arquivo
+		printf("concatenando\n");
 		strcat(texto_completo, data);//concatenando cada linha do arquivo para gerar o texto completo
 	}
 
@@ -42,27 +48,34 @@ void trata_cliente(int socket_cliente) {
 			texto[i-5] = buffer[i];
 			++i;
 		}
-	}
-
-	strcpy(texto, get_data(texto));//Pegando os dados do arquivo desejado
-
-	while (tamanho_recebido > 0) {
-		tamanho_envio = strlen(texto);//pegando o tamanho do texto
-		//verifica se todos os bytes foram enviados
-		if(send(socket_cliente, texto, tamanho_envio, 0) != tamanho_envio)
-			printf("Erro no envio - send()\n");
-		
-		if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
-			printf("Erro no recv()\n");
+		printf("Passou do if..\n");
+		strcpy(texto, get_data(texto));//Pegando os dados do arquivo desejado
+		while (tamanho_recebido > 0) {
+			printf("Entrou no while...\n");
+			tamanho_envio = strlen(texto);//pegando o tamanho do texto
+			//verifica se todos os bytes foram enviados
+			if(send(socket_cliente, texto, tamanho_envio, 0) != tamanho_envio)
+				printf("Erro no envio - send()\n");
+			
+			if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
+				printf("Erro no recv()\n");
+		}
+		printf("Saiu do while..\n");
+	}else{
+		printf("Requisição desconhecida!\n");
+		return 0;
 	}
 }
 int main(int argc, char *argv[]) {
+	//pthread_t *thread;
 	int socket_servidor;
 	int socket_cliente;
 	struct sockaddr_in servidorAddr;
 	struct sockaddr_in clienteAddr;
 	unsigned short servidorPorta;
 	unsigned int cliente_length;
+
+	//thread = malloc(sizeof(pthread_t));
 	if (argc != 2) { //Caso não tenha entrado com os parâmetros certos
 		printf("Uso: %s <Porta>\n", argv[0]);
 		exit(1);
@@ -70,7 +83,7 @@ int main(int argc, char *argv[]) {
 	servidorPorta = atoi(argv[1]);
 	// Abrir Socket
 	if((socket_servidor = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) //Gerando um socket tcp
-		printf("falha no socker do Servidor\n");
+		printf("falha no socket do Servidor\n");
 	
 	// Montando a estrutura sockaddr_in
 	memset(&servidorAddr, 0, sizeof(servidorAddr)); // Zerando a estrutura de dados
