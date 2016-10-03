@@ -9,9 +9,8 @@ void get_text(char *mensagem, int clienteSocket){
 	int tamanhoMensagem;
 	char requisicao[200];
 
-	strcpy(requisicao, "GET /");
-	strcat(requisicao, mensagem);
-	strcat(requisicao, " HTTP/1.1\r\n\r\n"); //sempre terminar uma requisição com \r\n\r\n
+	strcpy(requisicao, mensagem);
+	//strcat(requisicao, " HTTP/1.1\r\n\r\n"); //sempre terminar uma requisição com \r\n\r\n
 	printf("requisicao: %s\n", requisicao);
 	tamanhoMensagem = strlen(requisicao);
 	if(send(clienteSocket, requisicao, tamanhoMensagem, 0) != tamanhoMensagem)

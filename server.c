@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE
 #include <stdio.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -6,23 +7,29 @@
 #include <unistd.h>
 #include <pthread.h>
 
+//gcc -o server server.c -dbg -lcrypt
+
+char * hash_data(char *texto){//Criando hash da mensagem:
+	printf("encriptando: %s\n", texto);
+	texto = crypt(texto, "ab");
+	printf("Hash: %s\n", texto);
+    return texto;
+}
 char * get_data(char *texto){
 	char * data;
 	char * texto_completo;
 	FILE *fp;
-	printf("Chegou no get_data\n");
+
 	fp = fopen(texto, "r");
 	if(fp == NULL){//abrindo arquivo somente para leitura
 		printf("404 Not Found");
 		return "404 Not Found\n";
 	}
-	printf("indo..\n");
+
 	data = malloc(sizeof(char*));
 	texto_completo = malloc(sizeof(char*));
 
-	printf("olha..\n");
 	while(fgets(data, 100, (FILE*)fp) != NULL){//Enquanto não chegar ao fim do arquivo
-		printf("concatenando\n");
 		strcat(texto_completo, data);//concatenando cada linha do arquivo para gerar o texto completo
 	}
 
@@ -39,19 +46,16 @@ void trata_cliente(int socket_cliente) {
 		printf("Erro no recv()\n");
 	buffer[tamanho_recebido] = '\0';//adicionando final da string
 
-	printf("Recebi algo: %s \n", buffer);
-
+	printf("recebido:%s\n\n", buffer);
 	//É uma requisição GET?
 	if(buffer[0] == 'G' && buffer[1] == 'E' && buffer[2] == 'T'){
-		i=5;//o nome do arquivo começa na posição 5 do vetor, acabando no próximo espaço em branco.
-		while(buffer[i] != ' '){ //faço o parser para obter o arquivo desejado pelo cliente
-			texto[i-5] = buffer[i];
-			++i;
+		printf("olha: %s\n", buffer);
+		//o nome do arquivo começa na posição 4 do vetor, acabando no próximo espaço em branco.
+		for(i=4 ; i<=strlen(buffer)+4 ; i++){ //faço o parser para obter o arquivo desejado pelo cliente
+			texto[i-4] = buffer[i];
 		}
-		printf("Passou do if..\n");
 		strcpy(texto, get_data(texto));//Pegando os dados do arquivo desejado
 		while (tamanho_recebido > 0) {
-			printf("Entrou no while...\n");
 			tamanho_envio = strlen(texto);//pegando o tamanho do texto
 			//verifica se todos os bytes foram enviados
 			if(send(socket_cliente, texto, tamanho_envio, 0) != tamanho_envio)
@@ -60,14 +64,29 @@ void trata_cliente(int socket_cliente) {
 			if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
 				printf("Erro no recv()\n");
 		}
-		printf("Saiu do while..\n");
-	}else{
-		printf("Requisição desconhecida!\n");
-		return 0;
-	}
+	}else 
+		if(buffer[0] == 'H' && buffer[1] == 'A' && buffer[2] == 'S' && buffer[3] == 'H' && buffer[4] == 'M' && buffer[5] == 'E' ){
+			//o nome do arquivo começa na posição 8 do vetor, acabando no próximo espaço em branco.
+			for(i=7 ; i<=strlen(buffer)+7 ; i++){ //faço o parser para obter o arquivo desejado pelo cliente
+				texto[i-7] = buffer[i];
+			}
+			strcpy(texto, hash_data(texto));
+			while (tamanho_recebido > 0) {
+				tamanho_envio = strlen(texto);//pegando o tamanho do texto
+				//verifica se todos os bytes foram enviados
+				if(send(socket_cliente, texto, tamanho_envio, 0) != tamanho_envio)
+					printf("Erro no envio - send()\n");
+				
+				if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
+					printf("Erro no recv()\n");
+			}
+		}else{
+			printf("Requisição desconhecida!\n");
+			return;
+		}
 }
 int main(int argc, char *argv[]) {
-	//pthread_t *thread;
+	pthread_t *thread;
 	int socket_servidor;
 	int socket_cliente;
 	struct sockaddr_in servidorAddr;
