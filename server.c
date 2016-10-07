@@ -7,21 +7,21 @@
 #include <unistd.h>
 #include <pthread.h>
 
-//gcc -o server server.c -dbg -lcrypt
+//gcc -o server server.c -dbg -lcrypt -lpthread
 
 char * hash_data(char *texto){//Criando hash da mensagem:
-	printf("encriptando: %s\n", texto);
 	texto = crypt(texto, "ab");
-	printf("Hash: %s\n", texto);
     return texto;
 }
+
+//Função para pegar a informação presente no arquivo demandado pelo cliente.
 char * get_data(char *texto){
 	char * data;
 	char * texto_completo;
 	FILE *fp;
 
-	fp = fopen(texto, "r");
-	if(fp == NULL){//abrindo arquivo somente para leitura
+	fp = fopen(texto, "r");//abrindo arquivo somente para leitura
+	if(fp == NULL){//Caso não encontre o arquivo
 		printf("404 Not Found");
 		return "404 Not Found\n";
 	}
@@ -34,22 +34,21 @@ char * get_data(char *texto){
 	}
 
 	fclose(fp);
-	return texto_completo;
+	return texto_completo;//Retorna o conteudo do arquivo
 }
 
-void trata_cliente(int socket_cliente) {
+//Função utilizada para tratar toda a conexão com o cliente
+void * trata_cliente(void * socket_cliente) {
 	char buffer[200];
 	char texto[200];
 	int tamanho_recebido, tamanho_envio, i;
+	int socket = *((int*) socket_cliente);
 	//pega a info, retornando o tamanho dessa info
-	if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
+	if((tamanho_recebido = recv(socket, buffer, 200, 0)) < 0)
 		printf("Erro no recv()\n");
 	buffer[tamanho_recebido] = '\0';//adicionando final da string
-
-	printf("recebido:%s\n\n", buffer);
 	//É uma requisição GET?
 	if(buffer[0] == 'G' && buffer[1] == 'E' && buffer[2] == 'T'){
-		printf("olha: %s\n", buffer);
 		//o nome do arquivo começa na posição 4 do vetor, acabando no próximo espaço em branco.
 		for(i=4 ; i<=strlen(buffer)+4 ; i++){ //faço o parser para obter o arquivo desejado pelo cliente
 			texto[i-4] = buffer[i];
@@ -58,10 +57,10 @@ void trata_cliente(int socket_cliente) {
 		while (tamanho_recebido > 0) {
 			tamanho_envio = strlen(texto);//pegando o tamanho do texto
 			//verifica se todos os bytes foram enviados
-			if(send(socket_cliente, texto, tamanho_envio, 0) != tamanho_envio)
+			if(send(socket, texto, tamanho_envio, 0) != tamanho_envio)
 				printf("Erro no envio - send()\n");
 			
-			if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
+			if((tamanho_recebido = recv(socket, buffer, 200, 0)) < 0)
 				printf("Erro no recv()\n");
 		}
 	}else 
@@ -74,17 +73,22 @@ void trata_cliente(int socket_cliente) {
 			while (tamanho_recebido > 0) {
 				tamanho_envio = strlen(texto);//pegando o tamanho do texto
 				//verifica se todos os bytes foram enviados
-				if(send(socket_cliente, texto, tamanho_envio, 0) != tamanho_envio)
+				if(send(socket, texto, tamanho_envio, 0) != tamanho_envio)
 					printf("Erro no envio - send()\n");
 				
-				if((tamanho_recebido = recv(socket_cliente, buffer, 200, 0)) < 0)
+				if((tamanho_recebido = recv(socket, buffer, 200, 0)) < 0)
 					printf("Erro no recv()\n");
 			}
 		}else{
 			printf("Requisição desconhecida!\n");
 			return;
 		}
+		close(socket);
+		pthread_detach(pthread_self());//Faz com que a própria thread seja desanexada sozinha, evitando
+		//a necessidade do pthread_join().
 }
+
+
 int main(int argc, char *argv[]) {
 	pthread_t *thread;
 	int socket_servidor;
@@ -94,7 +98,7 @@ int main(int argc, char *argv[]) {
 	unsigned short servidorPorta;
 	unsigned int cliente_length;
 
-	//thread = malloc(sizeof(pthread_t));
+	thread = malloc(sizeof(pthread_t));
 	if (argc != 2) { //Caso não tenha entrado com os parâmetros certos
 		printf("Uso: %s <Porta>\n", argv[0]);
 		exit(1);
@@ -124,9 +128,13 @@ int main(int argc, char *argv[]) {
 			printf("Falha no Accept\n");
 		
 		printf("Conexão do Cliente %s\n", inet_ntoa(clienteAddr.sin_addr));
+		//Criando uma thread para gerenciar a conexão com o cliente
+		//Possibilitando a conexão simultânea de diversos clientes.
+		if(pthread_create(thread, NULL, trata_cliente, (void *)&socket_cliente)!= 0){
+			printf("Erro ao criar a thread\n");
+		}
+		//trata_cliente(socket_cliente);
 		
-		trata_cliente(socket_cliente);
-		close(socket_cliente);
 	}
 	close(socket_servidor);
 }
